@@ -1,10 +1,10 @@
-// server.js
 const express = require('express');
+const path = require('path');
 const app = express();
 const PORT = 5000;
 
-// Serve public folder
-app.use(express.static('public'));
+// Serve files from root
+app.use(express.static(__dirname));
 
 // Test API endpoint
 app.get('/api/test', (req, res) => {
