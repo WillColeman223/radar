@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>VATSIM Test Radar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    html, body, #map { height:100%; margin:0; padding:0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([51.5, -0.12], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+
+    const flightMarkers = {};
+    const controllerMarkers = {};
+
+    function makePlaneIcon() {
+      return L.icon({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41]
+      });
+    }
+
+    async function updateData() {
+      try {
+        const res = await fetch('/api/test');
+        const { flights, controllers } = await res.json();
+
+        // Flights
+        const seenFlights = new Set();
+        flights.forEach(f => {
+          const id = f.callsign;
+          seenFlights.add(id);
+          const pos = [f.lat, f.lon];
+          if (flightMarkers[id]) {
+            flightMarkers[id].setLatLng(pos);
+          } else {
+            const m = L.marker(pos, { icon: makePlaneIcon() })
+                       .bindPopup(`<b>${f.callsign}</b><br>Alt: ${f.altitude} ft<br>Speed: ${f.groundspeed} kt`);
+            m.addTo(map);
+            flightMarkers[id] = m;
+          }
+        });
+        Object.keys(flightMarkers).forEach(id => {
+          if (!seenFlights.has(id)) {
+            map.removeLayer(flightMarkers[id]);
+            delete flightMarkers[id];
+          }
+        });
+
+        // Controllers
+        const seenCtrls = new Set();
+        controllers.forEach(c => {
+          const id = c.callsign;
+          seenCtrls.add(id);
+          const pos = [c.lat, c.lon];
+          if (controllerMarkers[id]) {
+            controllerMarkers[id].setLatLng(pos);
+          } else {
+            const m = L.marker(pos, { 
+              icon: L.divIcon({ html: `<div style="color:blue;font-size:12px;">${c.callsign}</div>`, className:'' })
+            }).bindPopup(`<b>ATC ${c.callsign}</b><br>Freq: ${c.frequency}<br>Rating: ${c.rating}`);
+            m.addTo(map);
+            controllerMarkers[id] = m;
+          }
+        });
+        Object.keys(controllerMarkers).forEach(id => {
+          if (!seenCtrls.has(id)) {
+            map.removeLayer(controllerMarkers[id]);
+            delete controllerMarkers[id];
+          }
+        });
+
+      } catch (e) {
+        console.error('Update error:', e);
+      }
+    }
+
+    updateData();
+    setInterval(updateData, 15000);
+  </script>
+</body>
+</html>
